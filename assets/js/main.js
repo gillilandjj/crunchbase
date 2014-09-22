@@ -1,4 +1,12 @@
 $( document ).ready(function() {
+
+  var resultsTable = $('#results-table').DataTable({
+    "dom": 'T<"clear">lfrtip',
+        "tableTools": {
+            "sSwfPath": "/swf/copy_csv_xls_pdf.swf"
+        }
+});
+  $('#error-code').hide();
     
   $(':text').keyup(function(e){
     if(e.keyCode == 13)
@@ -7,31 +15,26 @@ $( document ).ready(function() {
     }
   });
 
-  var ladda = {};
+  var ladda = null;
   var key = '1be853772d54cbc9d512d02be3fa0867';
   var organization = 'http://api.crunchbase.com/v/2/organization/';
-  var data = [];
   var row = [];
-  row.push('Company');
-  row.push('Description');
-  row.push('Categories');
-  row.push('Founders');
-  row.push('Website');
-  row.push('Employees');
-  row.push('Products');
-  data.push(row);
 
   $(':text').bind("enterKey", addToTable);
-  $( "#org-search" ).click(function(e) {
-	 	ladda = Ladda.create(this);
-    addToTable();
-  });
+  $( "#org-search" ).click(addToTable);
   $( "#download-csv" ).click(downloadCSV);
 
   function addToTable() {
+    if (ladda == null) {
+	 	  ladda = Ladda.create($('#org-search')[0]);
+    }
+
     var org_name = $('#org-name').val();
     if (org_name.length > 0) {
-    ladda.start();
+
+      //Start the spinner
+      $('#error-code').hide();
+      ladda.start();
 
       $.ajax({
           url: organization + org_name,
@@ -49,47 +52,61 @@ $( document ).ready(function() {
        
           // work with the response
           success: function( response ) {
-            ladda.stop();
-            //alert( JSON.stringify(response) ); // server response
+
             var company,
                 description = [],
                 categories = [],
-                website,
+                website = {},
                 founders = [],
-                employees,
+                employees = {},
                 products = [],
+                offices = [],
+                news = {},
                 row = [];
 
-            company = response.data.properties.name;
-            description.short = response.data.properties.short_description;
-            description.long = response.data.properties.description;
-            employees = response.data.properties.number_of_employees;
+            if (response) {
+              if (response.data) {
+                if (response.data.properties) {
+                  company = "<a href='http://www.crunchbase.com/organization/"+response.data.properties.permalink+"' target='_blank'>"+response.data.properties.name+"</a>";
+                  description.short = response.data.properties.short_description;
+                  description.long = response.data.properties.description;
+                  employees = response.data.properties.number_of_employees;
+                  website = "<a href='"+response.data.properties.homepage_url+"' target='_blank'>"+response.data.properties.homepage_url+"</a>";
+                }
 
-            $.each( response.data.relationships.founders.items, function( key, value ) {
-              founders.push("<a href='http://www.crunchbase.com/"+value.path+"' target='_blank'>"+value.name+"</a>");
-            });
+                if (response.data.relationships) {
+                  if (response.data.relationships.founders) {
+                    $.each( response.data.relationships.founders.items, function( key, value ) {
+                      founders.push("<a href='"+response.metadata.www_path_prefix+value.path+"' target='_blank'>"+value.name+"</a>");
+                    });
+                  }
 
-            $.each( response.data.relationships.categories.items, function( key, value ) {
-              categories.push(value.name);
-            });
+                  if (response.data.relationships.categories) {
+                    $.each( response.data.relationships.categories.items, function( key, value ) {
+                      categories.push(value.name);
+                    });
+                  }
 
-            $.each( response.data.relationships.products.items, function( key, value ) {
-              products.push("<a href='http://www.crunchbase.com/"+value.path+"' target='_blank'>"+value.name+"</a>");
-            });
+                  if (response.data.relationships.products) {
+                    $.each( response.data.relationships.products.items, function( key, value ) {
+                      products.push("<a href='"+response.metadata.www_path_prefix+value.path+"' target='_blank'>"+value.name+"</a>");
+                    });
+                  }
 
-            website = "<a href='"+response.data.properties.homepage_url+"' target='_blank'>"+response.data.properties.homepage_url+"</a>";
+                  if (response.data.relationships.news) {
+                    var lastNews = response.data.relationships.news.items[response.data.relationships.news.items.length-1];
+                    news = "<a href='"+lastNews.url+"' target='_blank'>"+lastNews.title+"</a>";
+                  }
 
-            var table_row = [
-              '<tr>',
-              '<td>'+company+'</td>',
-              '<td>'+description.short+'</td>',
-              '<td>'+categories.join(', ')+'</td>',
-              '<td>'+founders.join(', ')+'</td>',
-              '<td>'+website+'</td>',
-              '<td>'+employees+'</td>',
-              '<td>'+products.join(', ')+'</td>',
-              '</tr>'
-              ];
+                  if (response.data.relationships.offices) {
+                    $.each( response.data.relationships.offices.items, function( key, value ) {
+                      offices.push(value.name + " - " + value.city + " " + value.region);
+                    });
+                  }
+                }
+              }
+            }
+
             row.push(company);
             row.push(description.short);
             row.push(categories.join('; '));
@@ -97,16 +114,28 @@ $( document ).ready(function() {
             row.push(website);
             row.push(employees);
             row.push(products.join('; '));
-            data.push(row);
+            row.push(offices.join('; '));
+            row.push(news);
 
-            $('#results-table > tbody:last').append(table_row.join(''));
+            resultsTable.row.add(row).draw();
+          },
+
+          error: function() {
+
+            $('#error-code').show();
+          },
+
+          complete: function () {
+
+            // Stop the spinner
+            ladda.stop();
           }
       });
     }
   }
 
   function downloadCSV() {
-    //var data = [["name1", "city1", "some other info"], ["name2", "city2", "more info"]];
+
     var csvContent = "data:text/csv;charset=utf-8,";
     data.forEach(function(infoArray, index){
          dataString = infoArray.join(",");
