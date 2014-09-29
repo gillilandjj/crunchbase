@@ -5,7 +5,7 @@ $( document ).ready(function() {
         "tableTools": {
             "sSwfPath": "/swf/copy_csv_xls_pdf.swf"
         }
-});
+  });
   $('#error-code').hide();
     
   $(':text').keyup(function(e){
@@ -19,6 +19,17 @@ $( document ).ready(function() {
   var key = '1be853772d54cbc9d512d02be3fa0867';
   var organization = 'http://api.crunchbase.com/v/2/organization/';
   var row = [];
+  var data = [];
+  row.push('Company');
+  row.push('Description');
+  row.push('Categories');
+  row.push('Founders');
+  row.push('Website');
+  row.push('Employees');
+  row.push('Products');
+  row.push('Offices');
+  row.push('News');
+  data.push(row);
 
   $(':text').bind("enterKey", addToTable);
   $( "#org-search" ).click(addToTable);
@@ -117,6 +128,8 @@ $( document ).ready(function() {
             row.push(offices.join('; '));
             row.push(news);
 
+            data.push(row);
+
             resultsTable.row.add(row).draw();
           },
 
@@ -138,7 +151,7 @@ $( document ).ready(function() {
 
     var csvContent = "data:text/csv;charset=utf-8,";
     data.forEach(function(infoArray, index){
-         dataString = infoArray.join(",");
+         dataString = infoArray.join("\t");
             csvContent += index < infoArray.length ? dataString+ "\n" : dataString;
     }); 
     var encodedUri = encodeURI(csvContent);
